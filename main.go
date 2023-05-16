@@ -3,15 +3,21 @@ package main
 import (
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"reflect"
-	"time"
 
 	"samplelinebot/pkg/model"
+
+	"github.com/gin-gonic/gin"
+	"github.com/line/line-bot-sdk-go/v7/linebot"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
+
+var bot *linebot.Client
+var conf *config
 
 type config struct {
 	ServerPort           string `mapstructure:"SERVER_PORT"`
@@ -40,42 +46,71 @@ func (c config) MissingValue() []string {
 	return missings
 }
 
-func tryModel(cfg *config) {
-	model.InitClient(cfg.MongoURI, cfg.MongoUsername, cfg.MongoPassword)
+func messageHandler(c *gin.Context) {
+	events, err := bot.ParseRequest(c.Request)
+	if err != nil {
+		if err == linebot.ErrInvalidSignature {
+			c.Writer.WriteHeader(http.StatusBadRequest)
+		} else {
+			c.Writer.WriteHeader(http.StatusInternalServerError)
+		}
+		return
+	}
+
+	for _, event := range events {
+		if event.Type == linebot.EventTypeMessage {
+			switch message := event.Message.(type) {
+			case *linebot.TextMessage:
+				var userName string
+				if event.Source.UserID != "" {
+					profile, err := bot.GetProfile(event.Source.UserID).Do()
+					if err != nil {
+						log.Print(err)
+					}
+					userName = profile.DisplayName
+				}
+				msg := model.UserMessage{
+					UserName:    userName,
+					UserID:      event.Source.UserID,
+					MessageText: message.Text,
+					Timestamp:   event.Timestamp,
+				}
+
+				err := msg.Save()
+				if err != nil {
+					c.JSON(http.StatusBadGateway, struct{ Error string }{Error: "could not save message"})
+				}
+			}
+		}
+	}
+}
+
+func server(cmd *cobra.Command, args []string) {
+	var err error
+	bot, err = linebot.New(
+		conf.LineBotChannelSecret,
+		conf.LineBotChannelToken,
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	model.InitClient(conf.MongoURI, conf.MongoUsername, conf.MongoPassword)
 	defer func() {
 		if err := model.Disconnect(); err != nil {
-			panic(err)
+			log.Fatal(err)
 		}
 	}()
 
-	err := model.TestConnection()
-	if err != nil {
-		fmt.Printf("failed test of MongoDB connection: %s", err)
-	}
-
-	userID := "U1bacf29aaf2e34111fb"
-	msg := model.UserMessage{
-		UserName:    "Test User 1",
-		UserID:      userID,
-		MessageText: "Hello",
-		Timestamp:   time.Now(),
-	}
-
-	msg.Save()
-	history, err := model.GetHistory(userID)
-	if err != nil {
-		panic(fmt.Sprintf("failed of getting message history: %v", err))
-	}
-	historyText := model.FormatHistory(history)
-	fmt.Println(historyText)
+	r := gin.Default()
+	r.POST("/", messageHandler)
+	r.Run(":8080")
 }
 
 var rootCmd = &cobra.Command{
 	Use:   "hello",
 	Short: "Show hello",
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Hello!")
-	},
+	Run:   server,
 }
 
 func loadConfig() (*config, error) {
@@ -102,11 +137,11 @@ func loadConfig() (*config, error) {
 func main() {
 	cfg, err := loadConfig()
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	fmt.Printf("The server port is %s\n", cfg.ServerPort)
 
-	tryModel(cfg)
+	conf = cfg
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)

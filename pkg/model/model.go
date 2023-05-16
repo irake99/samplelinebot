@@ -3,7 +3,6 @@ package model
 import (
 	"context"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -29,13 +28,15 @@ type UserMessage struct {
 	Timestamp   time.Time `bson:"timestamp,omitempty"`
 }
 
-func (msg *UserMessage) Save() {
+func (msg *UserMessage) Save() error {
 	coll := client.Database("linebot").Collection("messages")
 
 	_, err := coll.InsertOne(context.Background(), msg)
 	if err != nil {
-		log.Print(err)
+		return fmt.Errorf("failed of saving message to MongoDB: %w", err)
 	}
+
+	return nil
 }
 
 func GetHistory(userID string) ([]UserMessage, error) {
