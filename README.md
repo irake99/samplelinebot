@@ -12,8 +12,29 @@
     set -a && . .env && set +a
     ```
 
-4. Run the program.
+4. Start MongoDB.
+
+    ```bash
+    sudo -E ./run-mongo.sh
+    ```
+
+5. Run the program.
 
     ```bash
     go run sample-linebot
+    ```
+
+
+---
+
+* Stop MongoDB
+
+    ```bash
+    sudo -E ./run-mongo.sh stop
+    ```
+
+* Remove MongoDB
+
+    ```bash
+    sudo -E ./run-mongo.sh remove
     ```
