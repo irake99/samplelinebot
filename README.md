@@ -18,10 +18,16 @@
     sudo -E ./run-mongo.sh
     ```
 
-5. Run the program.
+5. Start `ngrok` (Need to install before running)
 
     ```bash
-    go run sample-linebot
+    ngrok http 8080
+    ```
+
+6. Run the program.
+
+    ```bash
+    go run samplelinebot
     ```
 
 
