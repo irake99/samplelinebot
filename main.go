@@ -82,7 +82,7 @@ func messageHandler(c *gin.Context) {
 					c.JSON(http.StatusBadGateway, struct{ Error string }{Error: "could not save message"})
 				}
 
-				if strings.ToLower(message.Text) != "history" || event.Source.UserID == "" {
+				if strings.ToLower(strings.TrimSpace(message.Text)) != "history" || event.Source.UserID == "" {
 					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(fmt.Sprintf("I got: \"%s\" from \"%v\"", message.Text, userName))).Do(); err != nil {
 						log.Print(err)
 					}
