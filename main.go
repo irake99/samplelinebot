@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strings"
 
 	"samplelinebot/pkg/model"
 
@@ -81,8 +82,19 @@ func messageHandler(c *gin.Context) {
 					c.JSON(http.StatusBadGateway, struct{ Error string }{Error: "could not save message"})
 				}
 
-				if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(fmt.Sprintf("I got: \"%s\" from \"%v\"", message.Text, userName))).Do(); err != nil {
-					log.Print(err)
+				if strings.ToLower(message.Text) != "history" || event.Source.UserID == "" {
+					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(fmt.Sprintf("I got: \"%s\" from \"%v\"", message.Text, userName))).Do(); err != nil {
+						log.Print(err)
+					}
+				} else {
+					history, err := model.GetHistory(event.Source.UserID)
+					if err != nil {
+						c.JSON(http.StatusBadGateway, struct{ Error string }{Error: "could not get message history"})
+					}
+					replyMessage := model.FormatHistory(history)
+					if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(replyMessage)).Do(); err != nil {
+						log.Print(err)
+					}
 				}
 			}
 		}
