@@ -80,6 +80,10 @@ func messageHandler(c *gin.Context) {
 				if err != nil {
 					c.JSON(http.StatusBadGateway, struct{ Error string }{Error: "could not save message"})
 				}
+
+				if _, err = bot.ReplyMessage(event.ReplyToken, linebot.NewTextMessage(fmt.Sprintf("I got: \"%s\" from \"%v\"", message.Text, userName))).Do(); err != nil {
+					log.Print(err)
+				}
 			}
 		}
 	}
